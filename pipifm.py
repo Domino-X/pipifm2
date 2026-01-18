@@ -1,36 +1,24 @@
 import os
 import subprocess
 
-# --- KONFIGURACJA ---
-NAZWA_TELEFONU = "S23"  # Program będzie szukał urządzenia z tą nazwą
-CZESTOTLIWOSC = "107.9"
-# --------------------
-
 def start_radio():
-    print(f"Szukam telefonu: {NAZWA_TELEFONU}...")
+    # W PipeWire/PulseAudio '@DEFAULT_SOURCE@' to zawsze aktualnie grający telefon
+    source = "@DEFAULT_SOURCE@"
     
-    # Komenda wyszukująca ID urządzenia Bluetooth po nazwie
-    find_source = f"pactl list sources | grep -B 20 'device.description = .*{NAZWA_TELEFONU}' | grep 'Name:' | cut -d' ' -f2"
+    print(f"Przechwytuję aktywny strumień audio...")
+    
+    # Komenda, która bierze dźwięk z domyślnego źródła (Twojego S23)
+    # i wysyła go do nadajnika FM
+    cmd = (
+        f"parec -d {source} --latency-msec=20 | "
+        f"sox -t raw -r 44100 -e signed-integer -b 16 -c 2 - -t wav -b 16 -r 22050 -c 1 - | "
+        f"sudo chrt -f 99 ./pi_fm_rds -freq 107.9 -audio -"
+    )
     
     try:
-        source_id = subprocess.check_output(find_source, shell=True).decode().strip()
-        
-        if source_id:
-            print(f"Znalazłem! Łączę z: {source_id}")
-            # PEŁNA KOMENDA: Bluetooth -> Sox (odcinanie zacięć) -> Nadajnik (wysoki priorytet)
-            cmd = (
-                f"pacat -r -d {source_id} | "
-                f"sox -t raw -r 44100 -e signed-integer -b 16 -c 2 - -t wav -b 16 -r 22050 -c 1 - | "
-                f"sudo chrt -f 99 ./pi_fm_rds -freq {CZESTOTLIWOSC} -audio -"
-            )
-            os.system(cmd)
-        else:
-            print(f"BŁĄD: Nie widzę połączonego telefonu '{NAZWA_TELEFONU}'.")
-            print("Upewnij się, że Bluetooth w S23 jest połączony z Raspberry Pi.")
-            
+        os.system(cmd)
     except Exception as e:
-        print(f"Wystąpił błąd: {e}")
+        print(f"Błąd uruchamiania: {e}")
 
 if __name__ == "__main__":
     start_radio()
-
